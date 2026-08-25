@@ -1,0 +1,13 @@
+curl -s -u elastic:'PASSWORD' \
+  'https://localhost:9200/_security/user' |
+jq -r '
+  .[] |
+  [
+    .username,
+    .full_name,
+    .email,
+    (.roles | join(", ")),
+    .enabled
+  ] |
+  @tsv
+' | column -t -s $'\t'

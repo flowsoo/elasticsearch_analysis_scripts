@@ -1,0 +1,15 @@
+curl -s -u elastic:'PASSWORD' \
+  'https://localhost:9200/_security/api_key' |
+jq -r '
+  .api_keys[] |
+  [
+    .id,
+    .name,
+    .username,
+    .realm,
+    .creation,
+    .expiration,
+    .invalidated
+  ] |
+  @tsv
+' | column -t -s $'\t'

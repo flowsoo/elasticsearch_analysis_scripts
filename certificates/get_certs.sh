@@ -7,11 +7,7 @@
 #
 #   ./cert-inventory.sh
 #
-# Configure the two folders and three passwords below.
-#
-# IMPORTANT:
-#   This script only READS certificate files.
-#   It does not modify Elasticsearch or any certificate.
+# Configure the folders, passwords and keytool path below.
 #
 # ============================================================
 
@@ -71,6 +67,7 @@ echo
 echo "Generated : $(date)"
 echo "Folder 1  : $FOLDER1"
 echo "Folder 2  : $FOLDER2"
+echo "Keytool   : $KEYTOOL"
 echo
 
 if ! command -v openssl >/dev/null 2>&1; then
@@ -78,8 +75,15 @@ if ! command -v openssl >/dev/null 2>&1; then
     exit 1
 fi
 
-if ! command -v keytool >/dev/null 2>&1; then
-    echo "ERROR: keytool is not installed."
+if [[ ! -f "$KEYTOOL" ]]; then
+    echo "ERROR: keytool not found at:"
+    echo "  $KEYTOOL"
+    exit 1
+fi
+
+if ! "$KEYTOOL" -version >/dev/null 2>&1; then
+    echo "ERROR: keytool exists but cannot be executed:"
+    echo "  $KEYTOOL"
     exit 1
 fi
 
@@ -288,13 +292,15 @@ inspect_p12()
 
     local INFO
 
-    INFO=$(keytool \
-        -list \
-        -v \
-        -storetype PKCS12 \
-        -keystore "$FILE" \
-        -storepass "$PASSWORD" \
-        2>&1)
+    INFO=$(
+        "$KEYTOOL" \
+            -list \
+            -v \
+            -storetype PKCS12 \
+            -keystore "$FILE" \
+            -storepass "$PASSWORD" \
+            2>&1
+    )
 
     if echo "$INFO" | grep -qiE \
         "PrivateKeyEntry|trustedCertEntry|Certificate chain length"; then
@@ -364,10 +370,8 @@ inspect_p12()
         while read -r LINE; do
 
             if [[ "$LINE" == "-----BEGIN CERTIFICATE-----" ]]; then
-
                 CERT_INDEX=$((CERT_INDEX + 1))
                 TEMP_CERT=$(mktemp)
-
             fi
 
             if [[ -n "$TEMP_CERT" ]]; then
@@ -484,12 +488,14 @@ inspect_jks()
 
     local INFO
 
-    INFO=$(keytool \
-        -list \
-        -v \
-        -keystore "$FILE" \
-        -storepass "$PASSWORD" \
-        2>&1)
+    INFO=$(
+        "$KEYTOOL" \
+            -list \
+            -v \
+            -keystore "$FILE" \
+            -storepass "$PASSWORD" \
+            2>&1
+    )
 
     if echo "$INFO" | grep -qiE \
         "PrivateKeyEntry|trustedCertEntry"; then
@@ -526,7 +532,10 @@ process_file()
 
             BASENAME=$(basename "$FILE")
 
-            # Select password based on filename.
+            # ------------------------------------------------
+            # HTTP PKCS#12
+            # ------------------------------------------------
+
             if [[ "$BASENAME" == "http_node.p12" ]]; then
 
                 inspect_p12 \
@@ -534,29 +543,39 @@ process_file()
                     "$HTTP_P12_PASSWORD" \
                     "HTTP SSL keystore"
 
+
+            # ------------------------------------------------
+            # TRANSPORT PKCS#12
+            # ------------------------------------------------
+
             elif [[ "$BASENAME" == "node.p12" ]]; then
 
-                # Inspect using transport keystore password
+                # Transport keystore
                 inspect_p12 \
                     "$FILE" \
                     "$TRANSPORT_KEYSTORE_PASSWORD" \
                     "TRANSPORT SSL keystore"
 
-                # Inspect same file as transport truststore
+                # Transport truststore
                 inspect_p12 \
                     "$FILE" \
                     "$TRANSPORT_TRUSTSTORE_PASSWORD" \
                     "TRANSPORT SSL truststore"
 
+
+            # ------------------------------------------------
+            # UNKNOWN PKCS#12
+            # ------------------------------------------------
+
             else
 
-                # Unknown P12 - try transport keystore password
                 inspect_p12 \
                     "$FILE" \
                     "$TRANSPORT_KEYSTORE_PASSWORD" \
                     "UNKNOWN PKCS#12"
 
             fi
+
             ;;
 
 
@@ -592,6 +611,7 @@ process_file()
                 echo "  PEM file - contents not recognized"
 
             fi
+
             ;;
 
 
@@ -661,6 +681,7 @@ echo "============================================================"
 echo
 
 echo "Files found:"
+
 for FILE in "${FILES[@]}"; do
     echo "  $FILE"
 done

@@ -27,6 +27,17 @@ FOLDER1="/etc/elasticsearch"
 FOLDER2="/etc/elasticsearch/certs"
 
 # ------------------------------------------------------------
+# Elasticsearch / Java keytool path
+# ------------------------------------------------------------
+#
+# Examples:
+#
+# KEYTOOL="/usr/bin/keytool"
+# KEYTOOL="/usr/share/elasticsearch/jdk/bin/keytool"
+#
+KEYTOOL="/usr/share/elasticsearch/jdk/bin/keytool"
+
+# ------------------------------------------------------------
 # Elasticsearch secure-keystore passwords
 # ------------------------------------------------------------
 
